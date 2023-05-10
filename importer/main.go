@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -32,7 +33,9 @@ func main() {
 	isFirstRow := true
 	headerMap := make(map[string]int)
 
-	for i := 0; i < 10; i++ {
+	start := time.Now()
+
+	for {
 		record, err := csvReader.Read()
 		if err == io.EOF {
 			break
@@ -53,13 +56,12 @@ func main() {
 			continue
 		}
 
-		fmt.Println(record)
 		insertQuery := `insert into
 cards(
 	id,
 	artist,
-	asciiName,
-	borderColor,
+	name,
+	colors,
 	defense,
 	flavorText,
 	life,
@@ -75,11 +77,11 @@ cards(
 	supertypes
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,$13, $14, $15, $16, $17)`
 
-		res, err := conn.Exec(context.Background(), insertQuery,
+		_, err = conn.Exec(context.Background(), insertQuery,
 			record[headerMap["id"]],
 			record[headerMap["artist"]],
-			record[headerMap["asciiName"]],
-			record[headerMap["borderColor"]],
+			record[headerMap["name"]],
+			record[headerMap["colors"]],
 			record[headerMap["defense"]],
 			record[headerMap["flavorText"]],
 			record[headerMap["life"]],
@@ -99,7 +101,7 @@ cards(
 			panic(err)
 		}
 
-		fmt.Println("res", res)
 	}
 
+	fmt.Println("total time", time.Since(start))
 }
