@@ -1,11 +1,7 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/csv"
 	"fmt"
-	"io"
 	"os"
 	"time"
 
@@ -17,17 +13,11 @@ const ()
 
 
 var importers = []importer.Importer{
-	importer.NewPostgreSQLImporter(),
+	// importer.NewPostgreSQLImporter(),
 	importer.NewElasticSearchImporter(),
 }
 
 func main() {
-
-	data, err := os.ReadFile("./cards.csv")
-	if err != nil {
-		panic(err)
-	}
-
 	file, err := os.OpenFile("./cards.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
 		panic(err)
@@ -35,16 +25,18 @@ func main() {
 	defer file.Close()
 
 	for _, importer := range importers {
-		importer.Setup();
+		if err := importer.Setup(); err != nil {
+			panic(err)
+		}
 	}
 
-
-
-	reader := bytes.NewReader(data)
-
-	csvReader := csv.NewReader(reader)
-	isFirstRow := true
-	headerMap := make(map[string]int)
+	defer func() {
+		for _, importer := range importers {
+			if err := importer.Finish(); err != nil {
+				panic(err)
+			}
+		}
+	}()
 
 	start := time.Now()
 
@@ -54,31 +46,12 @@ func main() {
 		panic(err)
 	}
 
-
-	for {
-		record, err := csvReader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			panic(err)
-		}
-		if isFirstRow {
-
-			isFirstRow = false
-
-			// Add mapping: Column/property name --> record index
-			for i, v := range record {
-				headerMap[v] = i
+	for _, card := range cards {
+		for _, importer := range importers {
+			if err := importer.Upload(card); err != nil {
+				panic(err)
 			}
-
-			// Skip next code
-			continue
 		}
-	}
-
-	for _, importer := range importers {
-		importer.Finish();
 	}
 
 	fmt.Println("total time", time.Since(start))
